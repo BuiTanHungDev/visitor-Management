@@ -15,20 +15,17 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.UUID;
+import com.visitor.management.visitor.entity.VisitorSoldierRelationship;
+import java.util.HashSet;
+import java.util.Set;
 
 @Getter
 @Setter
 @NoArgsConstructor
 @Entity
-@Table(
-    name = "soldiers",
-    indexes = {
-        @Index(
-            name = "idx_soldiers_unit_id",
-            columnList = "unit_id"
-        )
-    }
-)
+@Table(name = "soldiers", indexes = {
+        @Index(name = "idx_soldiers_unit_id", columnList = "unit_id")
+})
 public class Soldier {
 
     @Id
@@ -36,31 +33,17 @@ public class Soldier {
     private UUID id;
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(
-        name = "user_id",
-        unique = true
-    )
+    @JoinColumn(name = "user_id", unique = true)
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(
-        name = "unit_id",
-        nullable = false
-    )
+    @JoinColumn(name = "unit_id", nullable = false)
     private OrganizationUnit unit;
 
-    @Column(
-        name = "service_number",
-        nullable = false,
-        length = 50
-    )
+    @Column(name = "service_number", nullable = false, length = 50)
     private String serviceNumber;
 
-    @Column(
-        name = "full_name",
-        nullable = false,
-        length = 150
-    )
+    @Column(name = "full_name", nullable = false, length = 150)
     private String fullName;
 
     @Column(name = "rank_name", length = 100)
@@ -76,14 +59,12 @@ public class Soldier {
     private String status = "ACTIVE";
 
     @CreationTimestamp
-    @Column(
-        name = "created_at",
-        nullable = false,
-        updatable = false
-    )
+    @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+    @OneToMany(mappedBy = "soldier")
+    private Set<VisitorSoldierRelationship> visitorRelationships = new HashSet<>();
 }
