@@ -1,0 +1,13 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "java",
+      "name": "Visitor Management",
+      "request": "launch",
+      "mainClass": "com.visitor.management.VisitorManagementApplication",
+      "projectName": "visitor-management",
+      "envFile": "${workspaceFolder}/.env"
+    }
+  ]
+}
