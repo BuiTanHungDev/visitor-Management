@@ -2,6 +2,7 @@
 package com.visitor.management.user.repository;
 
 import com.visitor.management.user.entity.User;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,14 +12,21 @@ import java.util.UUID;
 
 public interface UserRepository extends JpaRepository<User, UUID> {
 
+    /**
+     * Lấy User cùng Role và Permission.
+     */
     @Query("""
             SELECT DISTINCT u
             FROM User u
             LEFT JOIN FETCH u.userRoles ur
-            LEFT JOIN FETCH ur.role
+            LEFT JOIN FETCH ur.role r
+            LEFT JOIN FETCH r.rolePermissions rp
+            LEFT JOIN FETCH rp.permission
             WHERE u.id = :userId
             """)
-    Optional<User> findByIdWithRoles(@Param("userId") UUID userId);
+    Optional<User> findByIdWithRoles(
+            @Param("userId") UUID userId
+    );
 
     Optional<User> findByUsernameIgnoreCase(String username);
 

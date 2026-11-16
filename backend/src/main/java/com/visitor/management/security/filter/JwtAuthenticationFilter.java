@@ -30,76 +30,85 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-    private final JwtService jwtService;
-    private final UserRepository userRepository;
-    private final RevokedTokenRepository revokedTokenRepository;
+        private final JwtService jwtService;
+        private final UserRepository userRepository;
+        private final RevokedTokenRepository revokedTokenRepository;
 
-    @Override
-    protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain
-    ) throws ServletException, IOException {
+        @Override
+        protected void doFilterInternal(
+                        HttpServletRequest request,
+                        HttpServletResponse response,
+                        FilterChain filterChain) throws ServletException, IOException {
 
-        final String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
+                final String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
 
-        // Không có Bearer Token: tiếp tục filter chain.
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            filterChain.doFilter(request, response);
-            return;
-        }
-
-        final String token = authHeader.substring(7);
-
-        try {
-            UUID userId = jwtService.extractUserId(token);
-            UUID jti = jwtService.extractJti(token);
-
-            // Token đã bị thu hồi thì không xác thực.
-            if (revokedTokenRepository.existsByJti(jti)) {
-                SecurityContextHolder.clearContext();
-                filterChain.doFilter(request, response);
-                return;
-            }
-
-            if (SecurityContextHolder.getContext().getAuthentication() == null) {
-
-                User user = userRepository.findByIdWithRoles(userId)
-                        .orElse(null);
-
-                if (user != null
-                        && "ACTIVE".equals(user.getStatus())
-                        && jwtService.isTokenValid(token, userId)) {
-
-                    var authorities = user.getUserRoles()
-                            .stream()
-                            .map(userRole -> new SimpleGrantedAuthority(
-                                    "ROLE_" + userRole.getRole().getCode()
-                            ))
-                            .collect(Collectors.toSet());
-
-                    var authentication =
-                            new UsernamePasswordAuthenticationToken(
-                                    user,
-                                    null,
-                                    authorities
-                            );
-
-                    authentication.setDetails(
-                            new org.springframework.security.web.authentication
-                                    .WebAuthenticationDetailsSource()
-                                    .buildDetails(request)
-                    );
-
-                    SecurityContextHolder.getContext()
-                            .setAuthentication(authentication);
+                // Không có Bearer Token: tiếp tục filter chain.
+                if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                        filterChain.doFilter(request, response);
+                        return;
                 }
-            }
 
-        } catch (JwtException | IllegalArgumentException exception) {
-            SecurityContextHolder.clearContext();
+                final String token = authHeader.substring(7);
+
+                try {
+                        UUID userId = jwtService.extractUserId(token);
+                        UUID jti = jwtService.extractJti(token);
+
+                        // Token đã bị thu hồi thì không xác thực.
+                        if (revokedTokenRepository.existsByJti(jti)) {
+                                SecurityContextHolder.clearContext();
+                                filterChain.doFilter(request, response);
+                                return;
+                        }
+
+                        if (SecurityContextHolder.getContext().getAuthentication() == null) {
+
+                                User user = userRepository.findByIdWithRoles(userId)
+                                                .orElse(null);
+
+                                if (user != null
+                                                && "ACTIVE".equals(user.getStatus())
+                                                && jwtService.isTokenValid(token, userId)) {
+
+                                        var authorities = user.getUserRoles()
+                                                        .stream()
+                                                        .flatMap(userRole -> {
+                                                                var role = userRole.getRole();
+
+                                                                var roleAuthorities = java.util.stream.Stream.of(
+                                                                                new SimpleGrantedAuthority(
+                                                                                                "ROLE_" + role.getCode()));
+
+                                                                var permissionAuthorities = role.getRolePermissions()
+                                                                                .stream()
+                                                                                .map(rolePermission -> new SimpleGrantedAuthority(
+                                                                                                rolePermission.getPermission()
+                                                                                                                .getCode()));
+
+                                                                return java.util.stream.Stream.concat(
+                                                                                roleAuthorities,
+                                                                                permissionAuthorities);
+                                                        })
+                                                        .collect(Collectors.toSet());
+
+                                        var authentication = new UsernamePasswordAuthenticationToken(
+                                                        user,
+                                                        null,
+                                                        authorities);
+
+                                        authentication.setDetails(
+                                                        new org.springframework.security.web.authentication.WebAuthenticationDetailsSource()
+                                                                        .buildDetails(request));
+
+                                        SecurityContextHolder.getContext()
+                                                        .setAuthentication(authentication);
+                                }
+                        }
+
+                } catch (JwtException | IllegalArgumentException exception) {
+                        SecurityContextHolder.clearContext();
+                }
+
+                filterChain.doFilter(request, response);
         }
-
-        filterChain.doFilter(request, response);
-    }
 }
