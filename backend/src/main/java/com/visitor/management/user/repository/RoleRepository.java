@@ -1,3 +1,4 @@
+
 package com.visitor.management.user.repository;
 
 import com.visitor.management.user.entity.Role;
