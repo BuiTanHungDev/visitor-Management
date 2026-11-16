@@ -15,65 +15,64 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.Locale;
+import org.springframework.security.authentication.BadCredentialsException;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class AuthenticationService {
 
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final JwtService jwtService;
+        private final UserRepository userRepository;
+        private final PasswordEncoder passwordEncoder;
+        private final JwtService jwtService;
 
-    @Transactional
-    public LoginResponse authenticate(LoginRequest request) {
+        @Transactional
+        public LoginResponse authenticate(LoginRequest request) {
 
-        String identifier = request.getIdentifier().trim();
+                String identifier = request.getIdentifier().trim();
 
-        User user = findUserByIdentifier(identifier);
+                User user = findUserByIdentifier(identifier);
 
-        if (!passwordEncoder.matches(
-                request.getPassword(),
-                user.getPasswordHash())) {
+                if (!passwordEncoder.matches(
+                                request.getPassword(),
+                                user.getPasswordHash())) {
+                        throw new BadCredentialsException(
+                                        "Tên đăng nhập hoặc mật khẩu không chính xác");
+                }
 
-            throw new IllegalArgumentException(
-                    "Tên đăng nhập hoặc mật khẩu không chính xác");
+                if (!"ACTIVE".equals(user.getStatus())) {
+                        throw new BadCredentialsException(
+                                        "Tên đăng nhập hoặc mật khẩu không chính xác");
+                }
+
+                user.setLastLoginAt(Instant.now());
+
+                User authenticatedUser = userRepository.save(user);
+
+                String accessToken = jwtService.generateAccessToken(
+                                authenticatedUser);
+
+                return LoginResponse.builder()
+                                .userId(authenticatedUser.getId())
+                                .username(authenticatedUser.getUsername())
+                                .fullName(authenticatedUser.getFullName())
+                                .email(authenticatedUser.getEmail())
+                                .status(authenticatedUser.getStatus())
+                                .lastLoginAt(authenticatedUser.getLastLoginAt())
+                                .accessToken(accessToken)
+                                .tokenType("Bearer")
+                                .expiresIn(jwtService.getExpirationSeconds())
+                                .build();
         }
 
-        if (!"ACTIVE".equals(user.getStatus())) {
-            throw new IllegalArgumentException(
-                    "Tài khoản hiện không hoạt động");
+        private User findUserByIdentifier(String identifier) {
+
+                String normalizedIdentifier = identifier.toLowerCase(Locale.ROOT);
+
+                return userRepository.findByUsernameIgnoreCase(identifier)
+                                .or(() -> userRepository.findByEmailIgnoreCase(
+                                                normalizedIdentifier))
+                                .orElseThrow(() -> new BadCredentialsException(
+                                                "Tên đăng nhập hoặc mật khẩu không chính xác"));
         }
-
-        user.setLastLoginAt(Instant.now());
-
-        User authenticatedUser = userRepository.save(user);
-
-        String accessToken = jwtService.generateAccessToken(
-                authenticatedUser);
-
-        return LoginResponse.builder()
-                .userId(authenticatedUser.getId())
-                .username(authenticatedUser.getUsername())
-                .fullName(authenticatedUser.getFullName())
-                .email(authenticatedUser.getEmail())
-                .status(authenticatedUser.getStatus())
-                .lastLoginAt(authenticatedUser.getLastLoginAt())
-                .accessToken(accessToken)
-                .tokenType("Bearer")
-                .expiresIn(jwtService.getExpirationSeconds())
-                .build();
-    }
-
-    private User findUserByIdentifier(String identifier) {
-
-        String normalizedIdentifier =
-                identifier.toLowerCase(Locale.ROOT);
-
-        return userRepository.findByUsernameIgnoreCase(identifier)
-                .or(() -> userRepository.findByEmailIgnoreCase(
-                        normalizedIdentifier))
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Tên đăng nhập hoặc mật khẩu không chính xác"));
-    }
 }

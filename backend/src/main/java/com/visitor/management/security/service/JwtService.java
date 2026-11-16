@@ -2,6 +2,7 @@
 package com.visitor.management.security.service;
 
 import com.visitor.management.user.entity.User;
+
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
@@ -46,6 +47,7 @@ public class JwtService {
         Instant expiration = now.plusMillis(expirationMs);
 
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .subject(user.getId().toString())
                 .claim("username", user.getUsername())
                 .issuedAt(Date.from(now))
@@ -70,6 +72,30 @@ public class JwtService {
     public String extractUsername(String token) {
 
         return extractAllClaims(token).get("username", String.class);
+    }
+
+    /**
+     * Lấy JWT ID (jti) từ Token.
+     */
+    public UUID extractJti(String token) {
+
+        String jti = extractAllClaims(token).getId();
+
+        if (jti == null || jti.isBlank()) {
+            throw new JwtException("JWT không có mã định danh jti");
+        }
+
+        return UUID.fromString(jti);
+    }
+
+    /**
+     * Lấy thời điểm hết hạn của Token.
+     */
+    public Instant extractExpiration(String token) {
+
+        Date expiration = extractAllClaims(token).getExpiration();
+
+        return expiration.toInstant();
     }
 
     /**
