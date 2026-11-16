@@ -1,5 +1,8 @@
+
 package com.visitor.management.user.service;
 
+import com.visitor.management.user.dto.AddUserRolesRequest;
+import com.visitor.management.user.dto.UserRoleResponse;
 import com.visitor.management.user.entity.Role;
 import com.visitor.management.user.entity.User;
 import com.visitor.management.user.entity.UserRole;
@@ -13,8 +16,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -25,85 +31,150 @@ public class UserRoleService {
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
 
-    // Gán vai trò cho người dùng
-    @Transactional
-    public void assignRole(UUID userId, UUID roleId) {
-
-        User user = findUser(userId);
-        Role role = findRole(roleId);
-
-        if (userRoleRepository.existsByUser_IdAndRole_Id(userId, roleId)) {
-            throw new IllegalArgumentException(
-                    "Người dùng đã được gán vai trò này"
-            );
-        }
-
-        UserRole userRole = new UserRole();
-
-        UserRoleId id = new UserRoleId();
-        id.setUserId(userId);
-        id.setRoleId(roleId);
-
-        userRole.setId(id);
-        userRole.setUser(user);
-        userRole.setRole(role);
-
-        userRoleRepository.save(userRole);
-    }
-
-    // Thu hồi vai trò khỏi người dùng
-    @Transactional
-    public void removeRole(UUID userId, UUID roleId) {
+    // Lấy danh sách vai trò của User
+    public List<UserRoleResponse> getUserRoles(UUID userId) {
 
         if (!userRepository.existsById(userId)) {
             throw new IllegalArgumentException(
-                    "Không tìm thấy người dùng"
+                    "Không tìm thấy người dùng: " + userId
             );
         }
 
-        if (!roleRepository.existsById(roleId)) {
-            throw new IllegalArgumentException(
-                    "Không tìm thấy vai trò"
-            );
-        }
-
-        if (!userRoleRepository.existsByUser_IdAndRole_Id(userId, roleId)) {
-            throw new IllegalArgumentException(
-                    "Người dùng chưa được gán vai trò này"
-            );
-        }
-
-        userRoleRepository.deleteByUser_IdAndRole_Id(userId, roleId);
-    }
-
-    // Lấy danh sách vai trò của người dùng
-    public List<Role> getUserRoles(UUID userId) {
-
-        User user = findUser(userId);
-
-        return user.getUserRoles()
+        return userRoleRepository
+                .findAllByUserIdWithRole(userId)
                 .stream()
-                .map(UserRole::getRole)
+                .map(UserRoleResponse::from)
                 .toList();
     }
 
-    private User findUser(UUID userId) {
+    // Gán thêm vai trò cho User
+    @Transactional
+    public List<UserRoleResponse> addUserRoles(
+            UUID userId,
+            AddUserRolesRequest request
+    ) {
 
-        return userRepository.findById(userId)
+        User user = userRepository.findById(userId)
                 .orElseThrow(() ->
                         new IllegalArgumentException(
                                 "Không tìm thấy người dùng: " + userId
                         )
                 );
+
+        List<UUID> roleIds = request.getRoleIds();
+
+        // Kiểm tra ID trùng trong request
+        Set<UUID> uniqueIds = new HashSet<>(roleIds);
+
+        if (uniqueIds.size() != roleIds.size()) {
+            throw new IllegalArgumentException(
+                    "Danh sách vai trò chứa ID trùng lặp"
+            );
+        }
+
+        // Kiểm tra các Role có tồn tại
+        List<Role> roles = roleRepository.findAllById(roleIds);
+
+        if (roles.size() != roleIds.size()) {
+
+            Set<UUID> foundIds = roles.stream()
+                    .map(Role::getId)
+                    .collect(Collectors.toSet());
+
+            List<UUID> missingIds = roleIds.stream()
+                    .filter(id -> !foundIds.contains(id))
+                    .toList();
+
+            throw new IllegalArgumentException(
+                    "Không tìm thấy các vai trò: " + missingIds
+            );
+        }
+
+        // Chỉ thêm các Role User chưa có
+        List<UserRole> newUserRoles = roles.stream()
+                .filter(role ->
+                        !userRoleRepository.existsByUser_IdAndRole_Id(
+                                userId,
+                                role.getId()
+                        )
+                )
+                .map(role -> {
+
+                    UserRoleId id = new UserRoleId();
+                    id.setUserId(user.getId());
+                    id.setRoleId(role.getId());
+
+                    UserRole userRole = new UserRole();
+                    userRole.setId(id);
+                    userRole.setUser(user);
+                    userRole.setRole(role);
+
+                    return userRole;
+                })
+                .toList();
+
+        userRoleRepository.saveAllAndFlush(newUserRoles);
+
+        return getUserRoles(userId);
     }
 
-    private Role findRole(UUID roleId) {
+    // Thu hồi một Role khỏi User
+    @Transactional
+    public List<UserRoleResponse> removeUserRole(
+            UUID userId,
+            UUID roleId
+    ) {
 
-        return roleRepository.findById(roleId)
+        User user = userRepository.findById(userId)
+                .orElseThrow(() ->
+                        new IllegalArgumentException(
+                                "Không tìm thấy người dùng: " + userId
+                        )
+                );
+
+        Role role = roleRepository.findById(roleId)
                 .orElseThrow(() ->
                         new IllegalArgumentException(
                                 "Không tìm thấy vai trò: " + roleId
                         )
                 );
+
+        boolean assigned =
+                userRoleRepository.existsByUser_IdAndRole_Id(
+                        userId,
+                        roleId
+                );
+
+        if (!assigned) {
+            throw new IllegalArgumentException(
+                    "Người dùng chưa được gán vai trò này"
+            );
+        }
+
+        // Bảo vệ ADMIN cuối cùng đang hoạt động
+        if ("ADMIN".equalsIgnoreCase(role.getCode())
+                && "ACTIVE".equalsIgnoreCase(user.getStatus())) {
+
+            long activeAdminCount =
+                    userRoleRepository
+                            .countByRole_CodeIgnoreCaseAndUser_StatusIgnoreCase(
+                                    "ADMIN",
+                                    "ACTIVE"
+                            );
+
+            if (activeAdminCount <= 1) {
+                throw new IllegalArgumentException(
+                        "Không thể thu hồi vai trò ADMIN "
+                                + "của quản trị viên đang hoạt động cuối cùng"
+                );
+            }
+        }
+
+        userRoleRepository.deleteByUser_IdAndRole_Id(
+                userId,
+                roleId
+        );
+
+        return getUserRoles(userId);
     }
 }
