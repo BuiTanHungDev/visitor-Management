@@ -1,5 +1,6 @@
-
 package com.visitor.management.visitor.entity;
+
+import com.visitor.management.user.entity.User;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -37,6 +38,13 @@ public class Visitor {
     @Id
     @Column(name = "id", nullable = false)
     private UUID id;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(
+        name = "user_id",
+        unique = true
+    )
+    private User user;
 
     @Column(
         name = "full_name",
