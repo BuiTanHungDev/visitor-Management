@@ -12,27 +12,30 @@ import java.util.UUID;
 
 public interface UserRepository extends JpaRepository<User, UUID> {
 
-    /**
-     * Lấy User cùng Role và Permission.
-     */
-    @Query("""
-            SELECT DISTINCT u
-            FROM User u
-            LEFT JOIN FETCH u.userRoles ur
-            LEFT JOIN FETCH ur.role r
-            LEFT JOIN FETCH r.rolePermissions rp
-            LEFT JOIN FETCH rp.permission
-            WHERE u.id = :userId
-            """)
-    Optional<User> findByIdWithRoles(
-            @Param("userId") UUID userId
-    );
+        /**
+         * Lấy User cùng Role và Permission.
+         */
+        @Query("""
+                        SELECT DISTINCT u
+                        FROM User u
+                        LEFT JOIN FETCH u.userRoles ur
+                        LEFT JOIN FETCH ur.role r
+                        LEFT JOIN FETCH r.rolePermissions rp
+                        LEFT JOIN FETCH rp.permission
+                        WHERE u.id = :userId
+                        """)
+        Optional<User> findByIdWithRoles(
+                        @Param("userId") UUID userId);
 
-    Optional<User> findByUsernameIgnoreCase(String username);
+        Optional<User> findByUsernameIgnoreCase(String username);
 
-    Optional<User> findByEmailIgnoreCase(String email);
+        Optional<User> findByEmailIgnoreCase(String email);
 
-    boolean existsByUsernameIgnoreCase(String username);
+        boolean existsByUsernameIgnoreCase(String username);
 
-    boolean existsByEmailIgnoreCase(String email);
+        boolean existsByEmailIgnoreCase(String email);
+
+        Optional<User> findByPhone(String phone);
+
+        boolean existsByPhone(String phone);
 }

@@ -67,12 +67,15 @@ public class AuthenticationService {
 
         private User findUserByIdentifier(String identifier) {
 
-                String normalizedIdentifier = identifier.toLowerCase(Locale.ROOT);
+                String normalizedIdentifier = identifier.trim();
 
-                return userRepository.findByUsernameIgnoreCase(identifier)
-                                .or(() -> userRepository.findByEmailIgnoreCase(
-                                                normalizedIdentifier))
+                String normalizedEmail = normalizedIdentifier.toLowerCase(Locale.ROOT);
+
+                return userRepository.findByUsernameIgnoreCase(normalizedIdentifier)
+                                .or(() -> userRepository.findByEmailIgnoreCase(normalizedEmail))
+                                .or(() -> userRepository.findByPhone(normalizedIdentifier))
                                 .orElseThrow(() -> new BadCredentialsException(
-                                                "Tên đăng nhập hoặc mật khẩu không chính xác"));
+                                                "Tên đăng nhập, email hoặc số điện thoại không chính xác"));
         }
+
 }

@@ -25,8 +25,8 @@ spring:
     enabled: true
     locations: classpath:db/migration
   # mail:
-  #   host: ${MAIL_HOST}
-  #   port: ${MAIL_PORT:587}
+  #   host: smtp.gmail.com
+  #   port: 587
   #   username: ${MAIL_USERNAME}
   #   password: ${MAIL_PASSWORD}
   #   properties:
@@ -48,17 +48,16 @@ app:
     jwt:
       secret: ${JWT_SECRET}
       expiration-ms: 900000
+
   bootstrap:
     admin:
       password: ${ADMIN_INITIAL_PASSWORD:}
+
   otp:
-    hmac-secret: ${OTP_HMAC_SECRET}
+    enabled: false
+    hmac-secret: ${OTP_HMAC_SECRET:}
     email:
-      # from: ${MAIL_USERNAME}
-      enabled: ${OTP_EMAIL_ENABLED:false}
+      enabled: false
+      from: ${spring.mail.username:}
     sms:
-        enabled: ${OTP_SMS_ENABLED:false}
-        api-url: https://api.otp.dev/v1/verifications
-        api-key: ${OTP_API_KEY:}
-        sender: ${OTP_SENDER:}
-        template-id: ${OTP_TEMPLATE_ID:}    
+      enabled: false
