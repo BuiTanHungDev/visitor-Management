@@ -8,25 +8,26 @@ import LoginPage from '../features/auth/pages/LoginPage'
 import RegisterPage from '../features/auth/pages/RegisterPage'
 import DashboardPage from '../features/dashboard/pages/DashboardPage'
 
+import ProtectedRoute from './ProtectedRoute'
+
 function AppRouter() {
   return (
     <Routes>
-      {/* Authentication */}
+      {/* Trang đăng nhập và đăng ký */}
       <Route element={<AuthLayout />}>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
       </Route>
 
-      {/* Main application */}
-      <Route element={<MainLayout />}>
-        <Route path="/dashboard" element={<DashboardPage />} />
+      {/* Các trang yêu cầu đăng nhập */}
+      <Route element={<ProtectedRoute />}>
+        <Route element={<MainLayout />}>
+          <Route path="/dashboard" element={<DashboardPage />} />
+        </Route>
       </Route>
 
-      {/* Default route */}
-      <Route path="/" element={<Navigate to="/login" replace />} />
-
-      {/* Not found */}
-      <Route path="*" element={<Navigate to="/login" replace />} />
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   )
 }
